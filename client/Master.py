@@ -2,7 +2,7 @@ import boto3
 import socket
 import time
 import paramiko
-
+import threading
 
 class Master:
     IMAGE_ID = 'ami-0eb89db7593b5d434'
@@ -72,15 +72,11 @@ class Master:
         print(f"Installed sklearn on {instance_ip}")
         return
 
-
-def main():
-    master = Master()
-
+def communication(master):
     serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serv.bind(('127.0.0.1', 8080))
     serv.listen(5)
     print("Listening on port 8080")
-
     while True:
         print("Waiting to accept")
         conn, addr = serv.accept()
@@ -94,6 +90,14 @@ def main():
             elif msg[0] == "get":
                 instance_ip = master.get_instance().encode("utf-8")
                 conn.send(instance_ip)
+
+def main():
+    master = Master()
+    x = threading.Thread(target=communication, args=(master,))
+    x.start()
+    while True:
+        print("multi-thread")
+        time.sleep(2)
 
 
 main()
