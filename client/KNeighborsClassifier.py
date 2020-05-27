@@ -10,4 +10,4 @@ class KNeighborsClassifier:
         return f"KNeighborsClassifier with {self.neighbors} neighbors"
 
     def fit_predict(self, train_x, train_y, test_x):
-        fit_predict("KNeighborsClassifier", train_x, train_y, test_x)
+        fit_predict(f"KNeighborsClassifier({self.neighbors})", train_x, train_y, test_x)

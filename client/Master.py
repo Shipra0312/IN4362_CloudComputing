@@ -33,6 +33,7 @@ class Master:
         new_instance = stopped_instances[0]
         self.ec2_client.start_instances(InstanceIds=[new_instance.id], DryRun=False)
         new_instance.wait_until_running()
+        time.sleep(60)
         return new_instance.public_ip_address
 
     def create_instance(self):
@@ -64,13 +65,19 @@ class Master:
 
         print("Setting up instance")
         client.connect(hostname=instance_ip, username="ubuntu", pkey=self.key)
+
+        stdin, stdout, stderr = client.exec_command("sudo apt update")
+        stdout.channel.recv_exit_status()
+
         stdin, stdout, stderr = client.exec_command("sudo apt install -y python3-pip")
         stdout.channel.recv_exit_status()
         print(f"Installed pip on {instance_ip}")
-        stdin, stdout, stderr = client.exec_command("pip3 install sklearn")
+
+        stdin, stdout, stderr = client.exec_command("pip3 install scikit-learn")
         stdout.channel.recv_exit_status()
         print(f"Installed sklearn on {instance_ip}")
         return
+
 
 def communication(master):
     serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -90,13 +97,15 @@ def communication(master):
             elif msg[0] == "get":
                 instance_ip = master.get_instance().encode("utf-8")
                 conn.send(instance_ip)
+            else:
+                break
+
 
 def main():
     master = Master()
     x = threading.Thread(target=communication, args=(master,))
     x.start()
     while True:
-        print("multi-thread")
         time.sleep(2)
 
 

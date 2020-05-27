@@ -1,0 +1,8 @@
+"from sklearn.neighbors import KNeighborsClassifier
+
+def main():
+    clf = classifier
+    clf.fit(train_x, train_y)
+    print(clf.predict(test_x))
+
+main()"
