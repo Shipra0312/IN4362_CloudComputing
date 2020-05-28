@@ -4,6 +4,7 @@ import time
 import paramiko
 import threading
 
+
 class Master:
     IMAGE_ID = 'ami-0eb89db7593b5d434'
     ec2 = boto3.resource('ec2')
@@ -63,7 +64,7 @@ class Master:
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        print("Setting up instance")
+        print(f"Setting up instance {instance_ip}")
         client.connect(hostname=instance_ip, username="ubuntu", pkey=self.key)
 
         stdin, stdout, stderr = client.exec_command("sudo apt update")
@@ -93,7 +94,6 @@ def communication(master):
             msg = str(data.decode("utf-8")).split("_")
             if msg[0] == "free":
                 master.free_instance(msg[1])
-                break
             elif msg[0] == "get":
                 instance_ip = master.get_instance().encode("utf-8")
                 conn.send(instance_ip)
