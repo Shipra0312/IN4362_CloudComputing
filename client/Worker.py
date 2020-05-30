@@ -52,6 +52,7 @@ class Worker:
         self.ec2_client.start_instances(InstanceIds=[new_instance.id], DryRun=False)
         new_instance.wait_until_running()
         time.sleep(60)
+        new_instance.reload()
         return new_instance.public_ip_address
 
     def create_instance(self):

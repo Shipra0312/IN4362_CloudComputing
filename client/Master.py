@@ -10,6 +10,8 @@ class Master:
     ec2 = boto3.resource('ec2')
 
     def __init__(self):
+        self.user_count = 0
+
         running_instances = list(self.ec2.instances.filter(
             Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))
         self.available_instances = list(map(lambda x: x.public_ip_address, running_instances))
@@ -19,6 +21,7 @@ class Master:
         [self.ports.put(x) for x in range(8081, 8099)]
 
     def get_instance(self):
+        self.user_count = self.user_count + 1
         if len(self.available_instances) == 0:
             return None
         instance_ip = self.available_instances[0]
@@ -28,6 +31,7 @@ class Master:
     def free_instance(self, instance_ip, port):
         self.available_instances.append(instance_ip)
         self.ports.put(port)
+        self.user_count = self.user_count - 1
 
 
 def start_listening(worker):
@@ -60,12 +64,32 @@ def communication(master):
                 break
 
 
+def monitor(master):
+    while True:
+        active_instance_amount = len(list(master.ec2.instances.filter(
+            Filters=[{'Name': 'instance-state-name', 'Values': ['pending', 'running', 'stopping', 'stopped']}])))
+        time.sleep(2)
+        if active_instance_amount < 2:
+            worker = Worker(None, None)
+            new_instance_thread = threading.Thread(target=create_instance, args=(worker, master))
+            new_instance_thread.start()
+        elif active_instance_amount - master.user_count < 2:
+            worker = Worker(None, None)
+            new_instance_thread = threading.Thread(target=create_instance, args=(worker, master))
+            new_instance_thread.start()
+
+
+def create_instance(worker, master):
+    print("Creating new instance")
+    master.available_instances.append(worker.create_instance())
+
+
 def main():
     master = Master()
-    x = threading.Thread(target=communication, args=(master,))
-    x.start()
-    while True:
-        time.sleep(2)
+    comm_thread = threading.Thread(target=communication, args=(master,))
+    comm_thread.start()
+    mon_thread = threading.Thread(target=monitor, args=(master,))
+    mon_thread.start()
 
 
 main()
