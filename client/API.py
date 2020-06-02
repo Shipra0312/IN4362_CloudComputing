@@ -1,8 +1,10 @@
 import socket
 import paramiko
+import math
+import numpy as np
 
 
-def fit_predict(classifier, train_x, train_y, test_x):
+def fit_predict(classifier, x_train, y_train, x_test):
     master = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     worker_port = get_port(master)
 
@@ -14,9 +16,13 @@ def fit_predict(classifier, train_x, train_y, test_x):
     instance_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     instance_ssh.connect(hostname=instance_ip, username="ubuntu", pkey=key)
 
+    write_x_data(instance_ssh, x_train, "x_train.txt")
+    write_y_data(instance_ssh, y_train, "y_train.txt")
+    write_x_data(instance_ssh, x_test, "x_test.txt")
+
     code = open("instance_code.txt").read()
-    code = code.replace("classifier", classifier).replace("train_x", str(train_x)) \
-        .replace("train_y", str(train_y)).replace("test_x", str(test_x))
+    code = code.replace("classifier", classifier)
+    #stdin, stdout, stderr = instance_ssh.exec_command(f"echo $(cat x_test.txt)")
     stdin, stdout, stderr = instance_ssh.exec_command(f"rm -f test.py;printf {code} >>test.py;python3 test.py")
     stdout.channel.recv_exit_status()
     output = stdout.read().decode("utf-8")
@@ -26,6 +32,43 @@ def fit_predict(classifier, train_x, train_y, test_x):
 
     free_instance(worker, instance_ip, worker_port)
     return output
+
+
+def calculate_step_size(n_features):
+    max_size = 5000
+    return int(math.ceil(max_size / n_features))
+
+
+def write_x_data(instance_ssh, data, filename):
+    instance_ssh.exec_command(f"rm -f {filename}")
+
+    step_size = calculate_step_size(data.shape[1])
+    windows = int(math.ceil(len(data) / step_size))
+    for i in range(windows):
+        index = np.minimum((i + 1) * step_size, len(data) + 1)
+        if i == windows - 1:
+            string = '\\n'.join(' '.join(str(cell) for cell in row) for row in data[i * step_size:]) + "\\n"
+        else:
+            string = '\\n'.join(' '.join(str(cell) for cell in row) for row in data[i * step_size:index]) + "\\n"
+        stdin, stdout, stderr = instance_ssh.exec_command(f"printf -- \"{string}\"  >>{filename}")
+        stdout.channel.recv_exit_status()
+    return
+
+
+def write_y_data(instance_ssh, data, filename):
+    instance_ssh.exec_command(f"rm -f {filename}")
+
+    step_size = calculate_step_size(data.shape[0])
+    windows = int(math.ceil(len(data) / step_size))
+    for i in range(windows):
+        index = np.minimum((i + 1) * step_size, len(data) + 1)
+        if i == windows - 1:
+            string = '\\n'.join(str(row) for row in data[i * step_size:]) + "\\n"
+        else:
+            string = '\\n'.join(str(row) for row in data[i * step_size:index]) + "\\n"
+        stdin, stdout, stderr = instance_ssh.exec_command(f"printf \"{string}\"  >>{filename}")
+        stdout.channel.recv_exit_status()
+    return
 
 
 def get_port(master):
