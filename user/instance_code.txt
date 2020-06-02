@@ -1,6 +1,10 @@
 "from sklearn.neighbors import KNeighborsClassifier
-import time
+import numpy as np
+
+x_train = np.loadtxt(\"x_train.txt\", dtype=\'float\')
+y_train = np.loadtxt(\"y_train.txt\", dtype=\'int\')
+x_test = np.loadtxt(\"x_test.txt\", dtype=\'float\')
 
 clf = classifier
-clf.fit(train_x, train_y)
-print(clf.predict(test_x))"
+clf.fit(x_train, y_train)
+print(clf.predict(x_test))"

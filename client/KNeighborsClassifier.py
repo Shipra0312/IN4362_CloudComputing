@@ -10,8 +10,8 @@ class KNeighborsClassifier:
     def __str__(self):
         return f"KNeighborsClassifier with {self.neighbors} neighbors"
 
-    def fit_predict(self, X_train, y_train, X_test):
-        output = fit_predict(f"KNeighborsClassifier({self.neighbors})", X_train, y_train, X_test)
+    def fit_predict(self, x_train, y_train, x_test):
+        output = fit_predict(f"KNeighborsClassifier({self.neighbors})", x_train, y_train, x_test)
         output = output.replace("[", "").replace("]", "")
         output = np.fromstring(output, dtype=int, sep=' ')
         return output
