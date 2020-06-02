@@ -101,3 +101,12 @@ class Worker:
         stdout.channel.recv_exit_status()
         print(f"Installed sklearn on {instance_ip}")
         return
+
+    def terminate_instance(self, instance_ip):
+        filters = [{
+            'Name': 'ip-address',
+            'Values': [instance_ip],
+        }]
+        results = self.ec2_client.describe_instances(Filters=filters)
+        instance_id = results['Reservations'][0]['Instances'][0]['InstanceId']
+        self.ec2_client.terminate_instances(InstanceIds=[instance_id], DryRun=False)

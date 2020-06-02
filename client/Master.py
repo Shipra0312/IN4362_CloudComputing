@@ -66,17 +66,30 @@ def communication(master):
 
 def monitor(master):
     while True:
-        active_instance_amount = len(list(master.ec2.instances.filter(
-            Filters=[{'Name': 'instance-state-name', 'Values': ['pending', 'running', 'stopping', 'stopped']}])))
         time.sleep(2)
-        if active_instance_amount < 2:
+        total_instance_amount = len(list(master.ec2.instances.filter(
+            Filters=[{'Name': 'instance-state-name', 'Values': ['pending', 'running', 'stopping', 'stopped']}])))
+        running_instance_amount = len(list(master.ec2.instances.filter(
+            Filters=[{'Name': 'instance-state-name', 'Values': ['pending', 'running']}])))
+        print(f"total_instance_amount: {total_instance_amount} and running_instance_amount: "
+              f"{running_instance_amount} with {master.user_count} users")
+        print(f"available: {master.available_instances}")
+        if running_instance_amount - master.user_count < 2:
+            worker = Worker(None, None)
+            start_instance_thread = threading.Thread(target=start_instance, args=(worker, master))
+            start_instance_thread.start()
+        elif running_instance_amount - master.user_count > 4:
+            worker = Worker(None, None)
+            stop_instance_thread = threading.Thread(target=stop_instance, args=(worker, master))
+            stop_instance_thread.start()
+        elif total_instance_amount - master.user_count < 5:
             worker = Worker(None, None)
             new_instance_thread = threading.Thread(target=create_instance, args=(worker, master))
             new_instance_thread.start()
-        elif active_instance_amount - master.user_count < 2:
+        elif total_instance_amount - master.user_count > 10:
             worker = Worker(None, None)
-            new_instance_thread = threading.Thread(target=create_instance, args=(worker, master))
-            new_instance_thread.start()
+            terminate_instance_thread = threading.Thread(target=terminate_instance, args=(worker, master))
+            terminate_instance_thread.start()
 
 
 def create_instance(worker, master):
@@ -84,7 +97,32 @@ def create_instance(worker, master):
     master.available_instances.append(worker.create_instance())
 
 
+def terminate_instance(worker, master):
+    if len(master.available_instances) == 0:
+        return
+    print("Terminating instance")
+    instance_ip = master.available_instances[0]
+    master.available_instances.remove(instance_ip)
+    worker.terminate_instance(instance_ip)
+
+
+def start_instance(worker, master):
+    print("Starting instance")
+    master.available_instances.append(worker.start_instance())
+
+
+def stop_instance(worker, master):
+    if len(master.available_instances) == 0:
+        return
+    print("Stopping instance")
+    instance_ip = master.available_instances[0]
+    master.available_instances.remove(instance_ip)
+    worker.stop_instance(instance_ip)
+
+
 def main():
+    #allow instance to handle large datasets
+    #change available instances to synchronized queue
     master = Master()
     comm_thread = threading.Thread(target=communication, args=(master,))
     comm_thread.start()

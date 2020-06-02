@@ -19,10 +19,13 @@ def fit_predict(classifier, train_x, train_y, test_x):
         .replace("train_y", str(train_y)).replace("test_x", str(test_x))
     stdin, stdout, stderr = instance_ssh.exec_command(f"rm -f test.py;printf {code} >>test.py;python3 test.py")
     stdout.channel.recv_exit_status()
-    print(stdout.read().decode("utf-8"))
-    print(stderr.read().decode("utf-8"))
+    output = stdout.read().decode("utf-8")
+    error = stderr.read().decode("utf-8")
+    print(output)
+    print(error)
 
     free_instance(worker, instance_ip, worker_port)
+    return output
 
 
 def get_port(master):

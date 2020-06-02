@@ -2,6 +2,5 @@
 import time
 
 clf = classifier
-time.sleep(5)
 clf.fit(train_x, train_y)
 print(clf.predict(test_x))"

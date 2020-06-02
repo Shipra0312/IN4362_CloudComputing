@@ -1,4 +1,5 @@
 from client.API import fit_predict
+import numpy as np
 
 
 class KNeighborsClassifier:
@@ -9,5 +10,8 @@ class KNeighborsClassifier:
     def __str__(self):
         return f"KNeighborsClassifier with {self.neighbors} neighbors"
 
-    def fit_predict(self, train_x, train_y, test_x):
-        fit_predict(f"KNeighborsClassifier({self.neighbors})", train_x, train_y, test_x)
+    def fit_predict(self, X_train, y_train, X_test):
+        output = fit_predict(f"KNeighborsClassifier({self.neighbors})", X_train, y_train, X_test)
+        output = output.replace("[", "").replace("]", "")
+        output = np.fromstring(output, dtype=int, sep=' ')
+        return output
