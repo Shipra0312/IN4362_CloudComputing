@@ -14,7 +14,9 @@ class Master:
 
         running_instances = list(self.ec2.instances.filter(
             Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))
-        self.available_instances = list(map(lambda x: x.public_ip_address, running_instances))
+        self.available_instances = Queue()
+        [self.available_instances.put(x) for x in running_instances]
+        #self.available_instances = list(map(lambda x: x.public_ip_address, running_instances))
         #self.available_instances = []
 
         self.ports = Queue()
@@ -22,14 +24,13 @@ class Master:
 
     def get_instance(self):
         self.user_count = self.user_count + 1
-        if len(self.available_instances) == 0:
+        if self.available_instances.empty():
             return None
-        instance_ip = self.available_instances[0]
-        self.available_instances.remove(instance_ip)
+        instance_ip = self.available_instances.get()
         return instance_ip
 
     def free_instance(self, instance_ip, port):
-        self.available_instances.append(instance_ip)
+        self.available_instances.put(instance_ip)
         self.ports.put(port)
         self.user_count = self.user_count - 1
 
@@ -73,7 +74,7 @@ def monitor(master):
             Filters=[{'Name': 'instance-state-name', 'Values': ['pending', 'running']}])))
         print(f"total_instance_amount: {total_instance_amount} and running_instance_amount: "
               f"{running_instance_amount} with {master.user_count} users")
-        print(f"available: {master.available_instances}")
+        print(f"available: {master.available_instances.queue}")
         if running_instance_amount - master.user_count < 2:
             worker = Worker(None, None)
             start_instance_thread = threading.Thread(target=start_instance, args=(worker, master))
@@ -94,40 +95,36 @@ def monitor(master):
 
 def create_instance(worker, master):
     print("Creating new instance")
-    master.available_instances.append(worker.create_instance())
+    master.available_instances.put(worker.create_instance())
 
 
 def terminate_instance(worker, master):
-    if len(master.available_instances) == 0:
+    if master.available_instances.empty():
         return
     print("Terminating instance")
-    instance_ip = master.available_instances[0]
-    master.available_instances.remove(instance_ip)
+    instance_ip = master.available_instances.get()
     worker.terminate_instance(instance_ip)
 
 
 def start_instance(worker, master):
     print("Starting instance")
-    master.available_instances.append(worker.start_instance())
+    master.available_instances.put(worker.start_instance())
 
 
 def stop_instance(worker, master):
-    if len(master.available_instances) == 0:
+    if master.available_instances.empty():
         return
     print("Stopping instance")
-    instance_ip = master.available_instances[0]
-    master.available_instances.remove(instance_ip)
+    instance_ip = master.available_instances.get()
     worker.stop_instance(instance_ip)
 
 
 def main():
-    #allow instance to handle large datasets
-    #change available instances to synchronized queue
     master = Master()
     comm_thread = threading.Thread(target=communication, args=(master,))
     comm_thread.start()
-    mon_thread = threading.Thread(target=monitor, args=(master,))
-    mon_thread.start()
+    #mon_thread = threading.Thread(target=monitor, args=(master,))
+    #mon_thread.start()
 
 
 main()
