@@ -1,4 +1,4 @@
-from client.API import fit_predict
+from server.API import fit_predict
 import numpy as np
 
 

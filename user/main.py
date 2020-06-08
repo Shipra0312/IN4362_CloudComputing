@@ -1,4 +1,4 @@
-from client.KNeighborsClassifier import KNeighborsClassifier
+from server.KNeighborsClassifier import KNeighborsClassifier
 from sklearn.datasets import make_blobs
 from sklearn.model_selection import train_test_split
 import numpy as np

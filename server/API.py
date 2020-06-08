@@ -2,36 +2,44 @@ import socket
 import paramiko
 import math
 import numpy as np
+from paramiko.ssh_exception import NoValidConnectionsError
 
 
 def fit_predict(classifier, x_train, y_train, x_test):
-    master = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    worker_port = get_port(master)
+    output = ''
+    while output == '':
+        master = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        worker_port = get_port(master)
 
-    worker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    instance_ip = get_instance(worker, worker_port)
-    key = paramiko.RSAKey.from_private_key_file("CC.pem")
+        worker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        instance_ip = get_instance(worker, worker_port)
+        key = paramiko.RSAKey.from_private_key_file("CC.pem")
 
-    instance_ssh = paramiko.SSHClient()
-    instance_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    instance_ssh.connect(hostname=instance_ip, username="ubuntu", pkey=key)
+        try:
+            instance_ssh = paramiko.SSHClient()
+            instance_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            instance_ssh.connect(hostname=instance_ip, username="ubuntu", pkey=key)
 
-    write_x_data(instance_ssh, x_train, "x_train.txt")
-    write_y_data(instance_ssh, y_train, "y_train.txt")
-    write_x_data(instance_ssh, x_test, "x_test.txt")
+            write_x_data(instance_ssh, x_train, "x_train.txt")
+            write_y_data(instance_ssh, y_train, "y_train.txt")
+            write_x_data(instance_ssh, x_test, "x_test.txt")
 
-    code = open("instance_code.txt").read()
-    code = code.replace("classifier", classifier)
-    #stdin, stdout, stderr = instance_ssh.exec_command(f"echo $(cat x_test.txt)")
-    stdin, stdout, stderr = instance_ssh.exec_command(f"rm -f test.py;printf {code} >>test.py;python3 test.py")
-    stdout.channel.recv_exit_status()
-    output = stdout.read().decode("utf-8")
-    error = stderr.read().decode("utf-8")
-    print(output)
-    print(error)
-
-    free_instance(worker, instance_ip, worker_port)
-    return output
+            code = open("instance_code.txt").read()
+            code = code.replace("classifier", classifier)
+            stdin, stdout, stderr = instance_ssh.exec_command(f"rm -f test.py;printf {code} >>test.py;python3 test.py")
+            stdout.channel.recv_exit_status()
+            output = stdout.read().decode("utf-8")
+            error = stderr.read().decode("utf-8")
+            print(f"output:{output}")
+            print(f"error:{error}")
+            if output == '':
+                free_instance_master(master, worker_port)
+            else:
+                free_instance(worker, instance_ip, worker_port)
+                return output
+        except(EOFError, NoValidConnectionsError, ConnectionResetError, socket.error):
+            free_instance_master(master, worker_port)
+            continue
 
 
 def calculate_step_size(n_features):
@@ -93,3 +101,9 @@ def free_instance(worker, instance_ip, port):
     worker.send(free)
     worker.close()
     print("Client closed")
+
+
+def free_instance_master(master, port):
+    print("Freeing crashed instance")
+    free = f"free_None_{port}".encode("utf-8")
+    master.send(free)

@@ -2,7 +2,7 @@ import boto3
 import socket
 import time
 import threading
-from client.Worker import Worker
+from server.Worker import Worker
 from queue import Queue
 
 
@@ -15,9 +15,7 @@ class Master:
         running_instances = list(self.ec2.instances.filter(
             Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))
         self.available_instances = Queue()
-        [self.available_instances.put(x) for x in running_instances]
-        #self.available_instances = list(map(lambda x: x.public_ip_address, running_instances))
-        #self.available_instances = []
+        [self.available_instances.put(x.public_ip_address) for x in running_instances]
 
         self.ports = Queue()
         [self.ports.put(x) for x in range(8081, 8099)]
@@ -30,9 +28,10 @@ class Master:
         return instance_ip
 
     def free_instance(self, instance_ip, port):
-        self.available_instances.put(instance_ip)
+        if not(instance_ip == "None"):
+            self.available_instances.put(instance_ip)
+            self.user_count = self.user_count - 1
         self.ports.put(port)
-        self.user_count = self.user_count - 1
 
 
 def start_listening(worker):
