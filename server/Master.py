@@ -122,8 +122,8 @@ def main():
     master = Master()
     comm_thread = threading.Thread(target=communication, args=(master,))
     comm_thread.start()
-    #mon_thread = threading.Thread(target=monitor, args=(master,))
-    #mon_thread.start()
+    mon_thread = threading.Thread(target=monitor, args=(master,))
+    mon_thread.start()
 
 
 main()

@@ -57,8 +57,7 @@ class Worker:
 
     def create_instance(self):
         new_instance = self.ec2.create_instances(ImageId=self.IMAGE_ID, InstanceType='t2.micro', MinCount=1, MaxCount=1,
-                    KeyName='CC', SecurityGroups=['launch-wizard-2'],
-                    IamInstanceProfile={'Name': 'SSM'})
+                    KeyName='CC', SecurityGroups=['launch-wizard-2'])
         new_instance[0].wait_until_running()
         time.sleep(60)
         new_instance[0].reload()
