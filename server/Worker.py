@@ -2,6 +2,7 @@ import socket
 import time
 import paramiko
 import boto3
+from botocore.exceptions import ClientError
 
 
 class Worker:
@@ -22,15 +23,19 @@ class Worker:
         while True:
             print("Worker waiting to accept")
             conn, addr = serv.accept()
+            print(addr)
             while True:
                 data = conn.recv(128)
                 print("worker msg: " + str(data.decode("utf-8")))
                 msg = str(data.decode("utf-8")).split("_")
                 if msg[0] == "free":
+                    instance_ip = self.get_instance().encode("utf-8")
+                    self.remove_security_group(instance_ip, msg[3])
                     self.free_instance(msg[1])
                     return
                 elif msg[0] == "get":
                     instance_ip = self.get_instance().encode("utf-8")
+                    self.add_security_group(instance_ip, msg[2])
                     conn.send(instance_ip)
                 else:
                     break
@@ -65,12 +70,7 @@ class Worker:
         return new_instance[0].public_ip_address
 
     def stop_instance(self, instance_ip):
-        filters = [{
-            'Name': 'ip-address',
-            'Values': [instance_ip],
-        }]
-        results = self.ec2_client.describe_instances(Filters=filters)
-        instance_id = results['Reservations'][0]['Instances'][0]['InstanceId']
+        instance_id = self.get_instance_id(instance_ip)
         self.ec2_client.stop_instances(InstanceIds=[instance_id], DryRun=False)
         return
 
@@ -109,3 +109,46 @@ class Worker:
         results = self.ec2_client.describe_instances(Filters=filters)
         instance_id = results['Reservations'][0]['Instances'][0]['InstanceId']
         self.ec2_client.terminate_instances(InstanceIds=[instance_id], DryRun=False)
+
+    def add_security_group(self, instance_ip, client_ip):
+        response = self.ec2_client.describe_vpcs()
+        vpc_id = response.get('Vpcs', [{}])[0].get('VpcId', '')
+        try:
+            response = self.ec2_client.create_security_group(GroupName=f'ML_worker_{client_ip}',
+                                                 Description='description',
+                                                 VpcId=vpc_id)
+            security_group_id = response['GroupId']
+            print('Security Group Created %s in vpc %s.' % (security_group_id, vpc_id))
+
+            data = self.ec2_client.authorize_security_group_ingress(
+                GroupId=security_group_id,
+                IpPermissions=[
+                    {'IpProtocol': 'tcp',
+                     'FromPort': 22,
+                     'ToPort': 22,
+                     'IpRanges': [{'CidrIp': f'{client_ip}/32'}]}
+                ])
+            instance_id = self.get_instance_id(instance_ip.decode("utf-8"))
+            self.ec2.Instance(instance_id).modify_attribute(Groups=[security_group_id])
+            print('Ingress Successfully Set %s' % data)
+            import pprint
+            pprint.PrettyPrinter().pprint(response)
+        except ClientError as e:
+            print(e)
+
+    def remove_security_group(self, instance_ip, client_ip):
+        try:
+            instance_id = self.get_instance_id(instance_ip.decode("utf-8"))
+            self.ec2.Instance(instance_id).modify_attribute(Groups=['sg-07b4f90762d7ed905'])
+            self.ec2_client.delete_security_group(GroupName=f'ML_worker_{client_ip}')
+        except ClientError as e:
+            print(e)
+
+    def get_instance_id(self, instance_ip):
+        filters = [{
+            'Name': 'ip-address',
+            'Values': [instance_ip],
+        }]
+        results = self.ec2_client.describe_instances(Filters=filters)
+        instance_id = results['Reservations'][0]['Instances'][0]['InstanceId']
+        return instance_id

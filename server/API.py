@@ -3,7 +3,7 @@ import paramiko
 import math
 import numpy as np
 from paramiko.ssh_exception import NoValidConnectionsError
-
+from urllib.request import Request, urlopen
 
 def fit_predict(classifier, x_train, y_train, x_test):
     output = ''
@@ -89,7 +89,9 @@ def get_port(master):
 
 def get_instance(worker, port):
     worker.connect(('127.0.0.1', port))
-    worker.send(b'get_instance')
+    req = Request('https://api.ipify.org', headers={'User-Agent': 'Mozilla/5.0'})
+    ip = urlopen(req).read().decode('utf8')
+    worker.send(bytes("get_instance_" + ip, encoding='utf-8'))
     instance_ip = worker.recv(128).decode("utf-8")
     print(f"Instance IP obtained: {instance_ip}")
     return instance_ip
@@ -97,7 +99,9 @@ def get_instance(worker, port):
 
 def free_instance(worker, instance_ip, port):
     print("Releasing instance")
-    free = f"free_{instance_ip}_{port}".encode("utf-8")
+    req = Request('https://api.ipify.org', headers={'User-Agent': 'Mozilla/5.0'})
+    ip = urlopen(req).read().decode('utf8')
+    free = f"free_{instance_ip}_{port}_{ip}".encode("utf-8")
     worker.send(free)
     worker.close()
     print("Client closed")
