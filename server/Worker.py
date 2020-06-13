@@ -31,6 +31,7 @@ class Worker:
                     return
                 elif msg[0] == "get":
                     instance_ip = self.get_instance().encode("utf-8")
+                    print(f"Giving out {instance_ip}")
                     conn.send(instance_ip)
                 else:
                     break

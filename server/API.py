@@ -37,7 +37,8 @@ def fit_predict(classifier, x_train, y_train, x_test):
             else:
                 free_instance(worker, instance_ip, worker_port)
                 return output
-        except(EOFError, NoValidConnectionsError, ConnectionResetError, socket.error):
+        except(EOFError, NoValidConnectionsError, ConnectionResetError, socket.error,
+               ConnectionAbortedError, socket.gaierror):
             free_instance_master(master, worker_port)
             continue
 
@@ -96,11 +97,9 @@ def get_instance(worker, port):
 
 
 def free_instance(worker, instance_ip, port):
-    print("Releasing instance")
     free = f"free_{instance_ip}_{port}".encode("utf-8")
     worker.send(free)
     worker.close()
-    print("Client closed")
 
 
 def free_instance_master(master, port):
